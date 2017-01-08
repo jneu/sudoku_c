@@ -26,6 +26,17 @@ typedef struct def_grid
 #define VALUE(g, rowz, colz) (VALUEX((g), RCZ_2_X(rowz, colz)))
 #define EXCLUDEDX(g, index, value) ((g)->cells[(index)].excluded[((value) - 1)])
 
+static int
+grid_box_start_index (int index)
+{
+  int box_index;
+
+  box_index = index - index % 3;
+  box_index -= ((box_index / 9) % 3) * 9;
+
+  return box_index;
+}
+
 static void
 grid_clear (grid * g)
 {
@@ -115,8 +126,7 @@ grid_set_value_at_index (grid * g, int index, value_t value)
         grid_set_exclusion_at_index (g, i, value);
     }
 
-  start = index - index % 3;
-  start -= ((start / 9) % 3) * 9;
+  start = grid_box_start_index (index);
   for (j = 0; j < 3; j++)
     {
       for (k = 0; k < 3; k++)
@@ -206,7 +216,7 @@ grid_algo_only_one_available_in_cell (grid * g, int index)
 
   for (i = 1; i <= 9; i++)
     {
-      if (!EXCLUDEDX(g, index, i))
+      if (!EXCLUDEDX (g, index, i))
         {
           if (UNKNOWN_VALUE != available)
             return;
@@ -216,6 +226,177 @@ grid_algo_only_one_available_in_cell (grid * g, int index)
     }
 
   grid_set_value_at_index (g, index, available);
+}
+
+static void
+grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
+{
+  int i;
+  int first, last;
+
+  first = -1;
+  last = -1;
+
+  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
+    {
+      if (value == VALUEX (g, i))
+        return;
+
+      if (!EXCLUDEDX (g, i, value))
+        {
+          if (first < 0)
+            first = i;
+          else
+            last = i;
+        }
+    }
+
+  if (first < 0)
+    {
+      fprintf (stderr,
+               "%s: value is not allowed in row - rowz: %d value: %d\n",
+               __FUNCTION__, rowz, (int) value);
+      exit (EXIT_FAILURE);
+    }
+
+  if (last < 0)
+    {
+      grid_set_value_at_index (g, first, value);
+    }
+  else
+    {
+      int first_colz, last_colz;
+      bool bounded = false;
+
+      first_colz = first % 9;
+      last_colz = last % 9;
+
+      if (first_colz < 3)
+        {
+          if (last_colz < 3)
+            bounded = true;
+        }
+      else if (first_colz < 6)
+        {
+          if (last_colz < 6)
+            bounded = true;
+        }
+      else
+        {
+          bounded = true;
+        }
+
+      if (bounded)
+        {
+          int j, k;
+          int start;
+          int first_box_rowz;
+
+          start = grid_box_start_index (first);
+          first_box_rowz = (first / 9) % 3;
+
+          for (j = 0; j < 3; j++)
+            {
+              if (j == first_box_rowz)
+                {
+                  start += 9;
+                }
+              else
+                {
+                  for (k = 0; k < 3; k++)
+                    {
+                      grid_set_exclusion_at_index (g, start, value);
+                      start++;
+                    }
+
+                  start += 9 - 3;
+                }
+            }
+        }
+    }
+}
+
+static void
+grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
+{
+  int i;
+  int first, last;
+
+  first = -1;
+  last = -1;
+
+  for (i = colz; i < 81; i += 9)
+    {
+      if (value == VALUEX (g, i))
+        return;
+
+      if (!EXCLUDEDX (g, i, value))
+        {
+          if (first < 0)
+            first = i;
+          else
+            last = i;
+        }
+    }
+
+  if (first < 0)
+    {
+      fprintf (stderr,
+               "%s: value is not allowed in column - colz: %d value: %d\n",
+               __FUNCTION__, colz, (int) value);
+      exit (EXIT_FAILURE);
+    }
+
+  if (last < 0)
+    {
+      grid_set_value_at_index (g, first, value);
+    }
+  else
+    {
+      int first_rowz, last_rowz;
+      bool bounded = false;
+
+      first_rowz = first / 9;
+      last_rowz = last / 9;
+
+      if (first_rowz < 3)
+        {
+          if (last_rowz < 3)
+            bounded = true;
+        }
+      else if (first_rowz < 6)
+        {
+          if (last_rowz < 6)
+            bounded = true;
+        }
+      else
+        {
+          bounded = true;
+        }
+
+      if (bounded)
+        {
+          int j, k;
+          int start;
+          int first_box_colz;
+
+          start = grid_box_start_index (first);
+          first_box_colz = first % 3;
+
+          for (j = 0; j < 3; j++)
+            {
+              for (k = 0; k < 3; k++)
+                {
+                  if (k != first_box_colz)
+                    grid_set_exclusion_at_index (g, start, value);
+
+                  start++;
+                }
+
+              start += 9 - 3;
+            }
+        }
+    }
 }
 
 void
@@ -316,6 +497,20 @@ main (void)
 
       for (i = 0; i < 81; i++)
         grid_algo_only_one_available_in_cell (&g, i);
+
+      for (i = 0; i < 9; i++)
+        {
+          value_t v;
+
+          for (v = 1; v <= 9; v++)
+            {
+              grid_algo_need_one_or_bounded_in_rowz (&g, i, v);
+              grid_algo_need_one_or_bounded_in_colz (&g, i, v);
+#if 0                           /* @@@ */
+              grid_algo_need_one_or_bounded_in_box (&g, i, v);
+#endif
+            }
+        }
 
       grid_pretty_print (&g);
     }
