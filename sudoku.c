@@ -399,37 +399,59 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
     }
 }
 
+#define TERM_RED "\x1B[31m"
+#define TERM_RESTORE "\x1B[0m"
+
 void
 grid_pretty_print (const grid * g)
 {
-  int i, j, k, m;
+  int i, j;
+  int rowz, colz;
 
   printf ("\n");
 
-  for (i = 0; i < 3; i++)
+  for (rowz = 0; rowz < 9; rowz++)
     {
-      if (0 != i)
-        printf ("-----------\n");
-
-      for (j = 0; j < 3; j++)
+      for (i = 0; i < 3; i++)
         {
-          for (k = 0; k < 3; k++)
+          for (colz = 0; colz < 9; colz++)
             {
-              if (0 != k)
-                printf ("|");
-
-              for (m = 0; m < 3; m++)
+              if (UNKNOWN_VALUE != VALUE (g, rowz, colz))
                 {
-                  value_t v = VALUE (g, j + i * 3, m + k * 3);
-
-                  if (UNKNOWN_VALUE == v)
-                    printf (" ");
+                  if (1 == i)
+                    printf (" %d ", (int) VALUE (g, rowz, colz));
                   else
-                    printf ("%d", (int) v);
+                    printf ("   ");
+                }
+              else
+                {
+                  for (j = 1; j <= 3; j++)
+                    {
+                      if (EXCLUDEDX (g, RCZ_2_X (rowz, colz), j + 3 * i))
+                        printf (" ");
+                      else
+                        printf (TERM_RED "%d" TERM_RESTORE, j + 3 * i);
+                    }
+                }
+
+              if (8 != colz)
+                {
+                  if (2 == (colz % 3))
+                    printf ("#");
+                  else
+                    printf ("|");
                 }
             }
 
           printf ("\n");
+        }
+
+      if (8 != rowz)
+        {
+          if (2 == (rowz % 3))
+            printf ("###################################\n");
+          else
+            printf ("-----------#-----------#-----------\n");
         }
     }
 
@@ -487,33 +509,38 @@ main (void)
   }
 #endif
 
-  grid_pretty_print (&g);
-
   while (g.dirty)
     {
       int i;
 
-      g.dirty = false;
-
-      for (i = 0; i < 81; i++)
-        grid_algo_only_one_available_in_cell (&g, i);
-
-      for (i = 0; i < 9; i++)
+      do
         {
-          value_t v;
+          g.dirty = false;
 
-          for (v = 1; v <= 9; v++)
+          for (i = 0; i < 81; i++)
+            grid_algo_only_one_available_in_cell (&g, i);
+
+          for (i = 0; i < 9; i++)
             {
-              grid_algo_need_one_or_bounded_in_rowz (&g, i, v);
-              grid_algo_need_one_or_bounded_in_colz (&g, i, v);
-#if 0                           /* @@@ */
-              grid_algo_need_one_or_bounded_in_box (&g, i, v);
+              value_t v;
+
+              for (v = 1; v <= 9; v++)
+                {
+                  grid_algo_need_one_or_bounded_in_rowz (&g, i, v);
+                  grid_algo_need_one_or_bounded_in_colz (&g, i, v);
+#if 0
+                  /* @@@ is this ever needed? */
+                  grid_algo_need_one_or_bounded_in_box (&g, i, v);
 #endif
+                }
             }
         }
+      while (g.dirty);
 
-      grid_pretty_print (&g);
+      /* @@@ add in the pidgen hole algos */
     }
+
+  grid_pretty_print (&g);
 
   return EXIT_SUCCESS;
 }
