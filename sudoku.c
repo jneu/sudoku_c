@@ -68,7 +68,7 @@ grid_set_exclusion_at_index (grid * g, int index, value_t value)
         break;
     }
 
-  if (9 == i)
+  if (10 == i)
     {
       fprintf (stderr, "%s: all values excluded for a cell - index: %d\n",
                __FUNCTION__, index);
