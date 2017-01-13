@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -6,11 +7,21 @@
 
 #include "grid.h"
 
+#define HISTORY_FILE "/Users/jneuheisel/.sudoku_history"
+
 int
 main (void)
 {
+  int rv;
   grid *g;
   bool done;
+
+  rv = read_history (HISTORY_FILE);
+  if (0 != rv)
+    {
+      if (ENOENT != rv)
+        printf ("warning: failed to read history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
+    }
 
   grid_create (&g);
 
@@ -79,8 +90,16 @@ main (void)
     }
   while (!done);
 
+  rv = write_history (HISTORY_FILE);
+  if (0 != rv)
+    {
+      printf ("warning: failed to write history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
+    }
+
+#if USE_VALGRIND
   grid_destroy (g);
   rl_clear_history ();
+#endif
 
   return EXIT_SUCCESS;
 }
