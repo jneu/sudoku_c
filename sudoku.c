@@ -23,6 +23,8 @@ main (void)
       line = readline ("> ");
       if (NULL == line)
         {
+          printf ("\n");
+
           done = true;
           continue;
         }
