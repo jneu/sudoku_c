@@ -468,6 +468,93 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
   return true;
 }
 
+static bool
+grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value)
+{
+  int i, j, k;
+  bool success;
+  int indices[9];
+  int num_indices;
+
+  i = ((box % 3) * 3) + ((box / 3) * 3) * 9;
+  num_indices = 0;
+
+  for (j = 0; j < 3; j++)
+    {
+      for (k = 0; k < 3; k++)
+        {
+          if (value == VALUEX (g, i))
+            return true;
+
+          if (!EXCLUDEDX (g, i, value))
+            indices[num_indices++] = i;
+
+          i++;
+        }
+
+      i += 9 - 3;
+    }
+
+  if (0 == num_indices)
+    {
+      printf ("%s: value is not allowed in box - box: %d value: %d\n", __FUNCTION__, box, (int) value);
+      return false;
+    }
+
+  if (1 == num_indices)
+    {
+      success = grid_set_value_at_index (g, indices[0], value);
+
+      if (!success)
+        return false;
+    }
+  else if (num_indices <= 3)
+    {
+      int rz1, cz1, rz2, cz2;
+
+      rz1 = indices[0] / 9;
+      cz1 = indices[0] % 9;
+
+      rz2 = indices[1] / 9;
+      cz2 = indices[1] % 9;
+
+      if (rz1 == rz2)
+        {
+          if ((2 == num_indices) || (rz1 == (indices[2] / 9)))
+            {
+              for (i = rz1 * 9; i < (rz1 + 1) * 9; i++)
+                {
+                  if (((i % 9) / 3) != (box % 3))
+                    {
+                      success = grid_set_exclusion_at_index (g, i, value);
+
+                      if (!success)
+                        return false;
+                    }
+                }
+            }
+        }
+      else if (cz1 == cz2)
+        {
+          if ((2 == num_indices) || (cz1 == (indices[2] % 9)))
+            {
+              for (i = cz1; i < 81; i += 9)
+                {
+                  if (((i / 9) / 3) != (box / 3))
+                    {
+                      success = grid_set_exclusion_at_index (g, i, value);
+
+                      if (!success)
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+  return true;
+}
+
 bool
 grid_solve (grid * g)
 {
@@ -504,9 +591,7 @@ grid_solve (grid * g)
                   if (!success)
                     return false;
 
-/* @@@
                   success = grid_algo_need_one_or_bounded_in_box (g, i, v);
-*/
 
                   if (!success)
                     return false;
@@ -514,8 +599,6 @@ grid_solve (grid * g)
             }
         }
       while (g->dirty);
-
-      /* @@@ add in the pidgen hole algos */
     }
 
   return true;
