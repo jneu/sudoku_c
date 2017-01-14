@@ -96,6 +96,7 @@ grid_set_value_at_index (grid * g, int index, value_t value)
   value_t i;
   int j, k;
   int start;
+  bool success;
   value_t cur_value = VALUEX (g, index);
 
   if (value == cur_value)
@@ -128,7 +129,9 @@ grid_set_value_at_index (grid * g, int index, value_t value)
     {
       if (i != index)
         {
-          if (!grid_set_exclusion_at_index (g, i, value))
+          success = grid_set_exclusion_at_index (g, i, value);
+
+          if (!success)
             return false;
         }
     }
@@ -138,7 +141,9 @@ grid_set_value_at_index (grid * g, int index, value_t value)
     {
       if (i != index)
         {
-          if (!grid_set_exclusion_at_index (g, i, value))
+          success = grid_set_exclusion_at_index (g, i, value);
+
+          if (!success)
             return false;
         }
     }
@@ -150,7 +155,9 @@ grid_set_value_at_index (grid * g, int index, value_t value)
         {
           if (start != index)
             {
-              if (!grid_set_exclusion_at_index (g, start, value))
+              success = grid_set_exclusion_at_index (g, start, value);
+
+              if (!success)
                 return false;
             }
 
@@ -278,6 +285,7 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
 {
   int i;
   int first, last;
+  bool success;
 
   first = -1;
   last = -1;
@@ -304,7 +312,9 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
 
   if (last < 0)
     {
-      if (!grid_set_value_at_index (g, first, value))
+      success = grid_set_value_at_index (g, first, value);
+
+      if (!success)
         return false;
     }
   else
@@ -349,7 +359,9 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
                 {
                   for (k = 0; k < 3; k++)
                     {
-                      if (!grid_set_exclusion_at_index (g, start, value))
+                      success = grid_set_exclusion_at_index (g, start, value);
+
+                      if (!success)
                         return false;
 
                       start++;
@@ -369,6 +381,7 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
 {
   int i;
   int first, last;
+  bool success;
 
   first = -1;
   last = -1;
@@ -395,7 +408,9 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
 
   if (last < 0)
     {
-      if (!grid_set_value_at_index (g, first, value))
+      success = grid_set_value_at_index (g, first, value);
+
+      if (!success)
         return false;
     }
   else
@@ -436,7 +451,9 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
                 {
                   if (k != first_box_colz)
                     {
-                      if (!grid_set_exclusion_at_index (g, start, value))
+                      success = grid_set_exclusion_at_index (g, start, value);
+
+                      if (!success)
                         return false;
                     }
 
@@ -459,12 +476,15 @@ grid_solve (grid * g)
       do
         {
           int i;
+          bool success;
 
           g->dirty = false;
 
           for (i = 0; i < 81; i++)
             {
-              if (!grid_algo_only_one_available_in_cell (g, i))
+              success = grid_algo_only_one_available_in_cell (g, i);
+
+              if (!success)
                 return false;
             }
 
@@ -474,16 +494,22 @@ grid_solve (grid * g)
 
               for (v = 1; v <= 9; v++)
                 {
-                  if (!grid_algo_need_one_or_bounded_in_rowz (g, i, v))
+                  success = grid_algo_need_one_or_bounded_in_rowz (g, i, v);
+
+                  if (!success)
                     return false;
 
-                  if (!grid_algo_need_one_or_bounded_in_colz (g, i, v))
+                  success = grid_algo_need_one_or_bounded_in_colz (g, i, v);
+
+                  if (!success)
                     return false;
 
-#if 0
-                  /* @@@ is this ever needed? */
-                  grid_algo_need_one_or_bounded_in_box (g, i, v);
-#endif
+/* @@@
+                  success = grid_algo_need_one_or_bounded_in_box (g, i, v);
+*/
+
+                  if (!success)
+                    return false;
                 }
             }
         }

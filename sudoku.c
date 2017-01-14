@@ -17,11 +17,8 @@ main (void)
   bool done;
 
   rv = read_history (HISTORY_FILE);
-  if (0 != rv)
-    {
-      if (ENOENT != rv)
-        printf ("warning: failed to read history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
-    }
+  if ((0 != rv) && (ENOENT != rv))
+    printf ("warning: failed to read history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
 
   grid_create (&g);
 
@@ -29,6 +26,7 @@ main (void)
   do
     {
       char *line;
+      bool success;
       bool run_solve = false;
 
       line = readline ("> ");
@@ -52,17 +50,23 @@ main (void)
 
           if (3 == sscanf (line, "s %d %d %d", &row, &column, &value))
             {
-              run_solve = grid_add_given_value (g, row, column, value);
+              success = grid_add_given_value (g, row, column, value);
+
+              if (success)
+                run_solve = true;
             }
           else if (3 == sscanf (line, "x %d %d %d", &row, &column, &value))
             {
-              run_solve = grid_add_given_exclusion (g, row, column, value);
+              success = grid_add_given_exclusion (g, row, column, value);
+
+              if (success)
+                run_solve = true;
             }
           else if (('g' == line[0]) && (' ' == line[1]) && (83 == strlen (line)))
             {
               int i;
 
-              run_solve = true;
+              success = true;
 
               grid_clear (g);
 
@@ -71,8 +75,11 @@ main (void)
                   char c = line[i + 2];
 
                   if ((c >= '1') && (c <= '9'))
-                    run_solve &= grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
+                    success &= grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
                 }
+
+              if (success)
+                run_solve = true;
             }
           else
             {
@@ -84,7 +91,9 @@ main (void)
 
       if (run_solve)
         {
-          if (grid_solve (g))
+          success = grid_solve (g);
+
+          if (success)
             grid_pretty_print (g);
         }
     }
@@ -92,9 +101,7 @@ main (void)
 
   rv = write_history (HISTORY_FILE);
   if (0 != rv)
-    {
-      printf ("warning: failed to write history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
-    }
+    printf ("warning: failed to write history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
 
 #if USE_VALGRIND
   grid_destroy (g);
