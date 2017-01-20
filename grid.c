@@ -1,6 +1,6 @@
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "grid.h"
@@ -16,6 +16,24 @@ struct def_grid
   cell cells[81];
   bool dirty;
 };
+
+#define ROW_2_ROWZ(r)             ((r) - 1)
+#define COL_2_COLZ(c)             ((c) - 1)
+#define RCZ_2_INDEX(rowz, colz)   ((colz) + ((rowz) * 9))
+#define VALUE(g, index)           ((g)->cells[(index)].value)
+#define VALUE_RCZ(g, rowz, colz)  (VALUE((g), RCZ_2_INDEX((rowz), (colz))))
+#define EXCLUDED(g, index, value) ((g)->cells[(index)].excluded[((value) - 1)])
+
+static int
+BOX_START (int index)
+{
+  int x;
+
+  x = index - (index % 3);
+  x -= ((x / 9) % 3) * 9;
+
+  return x;
+}
 
 void
 grid_create (grid ** g)
@@ -42,46 +60,36 @@ grid_clear (grid * g)
   memset (g, 0, sizeof (grid));
 }
 
-#define VALUEX(g, index) ((g)->cells[(index)].value)
-#define VALUE(g, rowz, colz) (VALUEX((g), RCZ_2_X(rowz, colz)))
-#define EXCLUDEDX(g, index, value) ((g)->cells[(index)].excluded[((value) - 1)])
-
-static int
-grid_box_start_index (int index)
-{
-  int box_index;
-
-  box_index = index - index % 3;
-  box_index -= ((box_index / 9) % 3) * 9;
-
-  return box_index;
-}
-
 bool
 grid_set_exclusion_at_index (grid * g, int index, value_t value)
 {
   value_t i;
+  bool found_non_excluded;
 
-  if (EXCLUDEDX (g, index, value))
+  if (EXCLUDED (g, index, value))
     return true;
 
-  if (value == VALUEX (g, index))
+  if (value == VALUE (g, index))
     {
       printf ("%s: excluding cell value which is already set - index: %d value: %d\n", __FUNCTION__, index,
               (int) value);
       return false;
     }
 
-  EXCLUDEDX (g, index, value) = true;
+  EXCLUDED (g, index, value) = true;
   g->dirty = true;
 
+  found_non_excluded = false;
   for (i = 1; i <= 9; i++)
     {
-      if (!EXCLUDEDX (g, index, i))
-        break;
+      if (!EXCLUDED (g, index, i))
+        {
+          found_non_excluded = true;
+          break;
+        }
     }
 
-  if (10 == i)
+  if (!found_non_excluded)
     {
       printf ("%s: all values excluded for a cell - index: %d\n", __FUNCTION__, index);
       return false;
@@ -97,7 +105,7 @@ grid_set_value_at_index (grid * g, int index, value_t value)
   int j, k;
   int start;
   bool success;
-  value_t cur_value = VALUEX (g, index);
+  value_t cur_value = VALUE (g, index);
 
   if (value == cur_value)
     return true;
@@ -109,23 +117,23 @@ grid_set_value_at_index (grid * g, int index, value_t value)
       return false;
     }
 
-  if (EXCLUDEDX (g, index, value))
+  if (EXCLUDED (g, index, value))
     {
       printf ("%s: value is excluded at this cell - index: %d value: %d\n", __FUNCTION__, index, (int) value);
       return false;
     }
 
-  VALUEX (g, index) = value;
+  VALUE (g, index) = value;
   g->dirty = true;
 
   for (i = 1; i <= 9; i++)
     {
       if (i != value)
-        EXCLUDEDX (g, index, i) = true;
+        EXCLUDED (g, index, i) = true;
     }
 
-  start = index - index % 9;
-  for (i = start; i < start + 9; i++)
+  start = index - (index % 9);
+  for (i = start; i < (start + 9); i++)
     {
       if (i != index)
         {
@@ -148,7 +156,7 @@ grid_set_value_at_index (grid * g, int index, value_t value)
         }
     }
 
-  start = grid_box_start_index (index);
+  start = BOX_START (index);
   for (j = 0; j < 3; j++)
     {
       for (k = 0; k < 3; k++)
@@ -173,13 +181,13 @@ grid_set_value_at_index (grid * g, int index, value_t value)
 bool
 grid_set_value (grid * g, int rowz, int colz, value_t value)
 {
-  return grid_set_value_at_index (g, RCZ_2_X (rowz, colz), value);
+  return grid_set_value_at_index (g, RCZ_2_INDEX (rowz, colz), value);
 }
 
 bool
 grid_set_exclusion (grid * g, int rowz, int colz, value_t exclusion)
 {
-  return grid_set_exclusion_at_index (g, RCZ_2_X (rowz, colz), exclusion);
+  return grid_set_exclusion_at_index (g, RCZ_2_INDEX (rowz, colz), exclusion);
 }
 
 bool
@@ -261,14 +269,14 @@ grid_algo_only_one_available_in_cell (grid * g, int index)
   value_t i;
   value_t available;
 
-  if (UNKNOWN_VALUE != VALUEX (g, index))
+  if (UNKNOWN_VALUE != VALUE (g, index))
     return true;
 
   available = UNKNOWN_VALUE;
 
   for (i = 1; i <= 9; i++)
     {
-      if (!EXCLUDEDX (g, index, i))
+      if (!EXCLUDED (g, index, i))
         {
           if (UNKNOWN_VALUE != available)
             return true;
@@ -292,10 +300,10 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
 
   for (i = rowz * 9; i < (rowz + 1) * 9; i++)
     {
-      if (value == VALUEX (g, i))
+      if (value == VALUE (g, i))
         return true;
 
-      if (!EXCLUDEDX (g, i, value))
+      if (!EXCLUDED (g, i, value))
         {
           if (first < 0)
             first = i;
@@ -346,7 +354,7 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
           int start;
           int first_box_rowz;
 
-          start = grid_box_start_index (first);
+          start = BOX_START (first);
           first_box_rowz = (first / 9) % 3;
 
           for (j = 0; j < 3; j++)
@@ -388,10 +396,10 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
 
   for (i = colz; i < 81; i += 9)
     {
-      if (value == VALUEX (g, i))
+      if (value == VALUE (g, i))
         return true;
 
-      if (!EXCLUDEDX (g, i, value))
+      if (!EXCLUDED (g, i, value))
         {
           if (first < 0)
             first = i;
@@ -442,7 +450,7 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
           int start;
           int first_box_colz;
 
-          start = grid_box_start_index (first);
+          start = BOX_START (first);
           first_box_colz = first % 3;
 
           for (j = 0; j < 3; j++)
@@ -483,10 +491,10 @@ grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value)
     {
       for (k = 0; k < 3; k++)
         {
-          if (value == VALUEX (g, i))
+          if (value == VALUE (g, i))
             return true;
 
-          if (!EXCLUDEDX (g, i, value))
+          if (!EXCLUDED (g, i, value))
             indices[num_indices++] = i;
 
           i++;
@@ -555,16 +563,357 @@ grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value)
   return true;
 }
 
+typedef struct def_block
+{
+  int items[9];
+  int num_items;
+} block;
+
+typedef struct def_pigeon_context pigeon_context;
+typedef bool (*pigeon_callback) (pigeon_context *);
+
+struct def_pigeon_context
+{
+  const block *b_orig;
+  int subset_card;
+
+  int offset;
+  grid *g;
+
+  block b_working;
+  bool excluded_working[9];
+
+  pigeon_callback handle_pigeon;
+};
+
+static bool
+enumerate_subsets_recurse (pigeon_context * context, int depth, int from)
+{
+  int i;
+  int start_num_items;
+  bool success;
+  const block *b_orig = context->b_orig;
+  block *b_working = &context->b_working;
+
+  start_num_items = b_working->num_items++;
+  depth--;
+
+  for (i = from; i < b_orig->num_items - depth; i++)
+    {
+      b_working->items[start_num_items] = b_orig->items[i];
+
+      if (0 == depth)
+        {
+          int j, k;
+          int num_not_fully_excluded;
+          cell *c = context->g->cells;
+          bool *p = context->excluded_working;
+
+          memcpy (p, c[b_working->items[0]].excluded, 9 * sizeof (bool));
+
+          for (j = 1; j < context->subset_card; j++)
+            {
+              const bool *p_orig = c[b_working->items[j]].excluded;
+
+              for (k = 0; k < 9; k++)
+                p[k] &= p_orig[k];
+            }
+
+          num_not_fully_excluded = 0;
+          for (j = 0; j < 9; j++)
+            if (!p[j])
+              num_not_fully_excluded++;
+
+          if (num_not_fully_excluded == context->subset_card)
+            {
+              success = context->handle_pigeon (context);
+
+              if (!success)
+                return false;
+            }
+        }
+      else
+        {
+          success = enumerate_subsets_recurse (context, depth, i + 1);
+
+          if (!success)
+            return false;
+        }
+    }
+
+  b_working->num_items = start_num_items;
+
+  return true;
+}
+
+static bool
+enumerate_subsets (grid * g, int offset, int subset_card, const block * b_orig, pigeon_callback handle_pigeon)
+{
+  pigeon_context context;
+
+  context.b_orig = b_orig;
+  context.subset_card = subset_card;
+  context.offset = offset;
+  context.g = g;
+  context.b_working.num_items = 0;
+  context.handle_pigeon = handle_pigeon;
+
+  return enumerate_subsets_recurse (&context, subset_card, 0);
+}
+
+static bool
+pigeon_clear_row (pigeon_context * context)
+{
+  int i, j;
+  bool success;
+  int subset_card = context->subset_card;
+  int rowz = context->offset;
+  grid *g = context->g;
+  block *b_working = &context->b_working;
+  bool *excluded_working = context->excluded_working;
+
+  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
+    {
+      bool use_it;
+
+      if (UNKNOWN_VALUE != VALUE (g, i))
+        continue;
+
+      use_it = true;
+
+      for (j = 0; j < subset_card; j++)
+        {
+          if (i == b_working->items[j])
+            {
+              use_it = false;
+              break;
+            }
+        }
+
+      if (!use_it)
+        continue;
+
+      for (j = 0; j < 9; j++)
+        {
+          if (!excluded_working[j])
+            {
+              success = grid_set_exclusion_at_index (g, i, (value_t) (j + 1));
+
+              if (!success)
+                return false;
+            }
+        }
+    }
+
+  return true;
+}
+
+static bool
+grid_algo_pigeon_vacant_in_rowz (grid * g, int rowz)
+{
+  int i;
+  int subset_card;
+  block vacant;
+
+  vacant.num_items = 0;
+
+  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
+    {
+      if (UNKNOWN_VALUE == VALUE (g, i))
+        vacant.items[vacant.num_items++] = i;
+    }
+
+  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
+    {
+      bool success;
+
+      success = enumerate_subsets (g, rowz, subset_card, &vacant, pigeon_clear_row);
+
+      if (!success)
+        return false;
+    }
+
+  return true;
+}
+
+static bool
+pigeon_clear_column (pigeon_context * context)
+{
+  int i, j;
+  bool success;
+  int subset_card = context->subset_card;
+  int colz = context->offset;
+  grid *g = context->g;
+  block *b_working = &context->b_working;
+  bool *excluded_working = context->excluded_working;
+
+  for (i = colz; i < 81; i += 9)
+    {
+      bool use_it;
+
+      if (UNKNOWN_VALUE != VALUE (g, i))
+        continue;
+
+      use_it = true;
+
+      for (j = 0; j < subset_card; j++)
+        {
+          if (i == b_working->items[j])
+            {
+              use_it = false;
+              break;
+            }
+        }
+
+      if (!use_it)
+        continue;
+
+      for (j = 0; j < 9; j++)
+        {
+          if (!excluded_working[j])
+            {
+              success = grid_set_exclusion_at_index (g, i, (value_t) (j + 1));
+
+              if (!success)
+                return false;
+            }
+        }
+    }
+
+  return true;
+}
+
+static bool
+grid_algo_pigeon_vacant_in_colz (grid * g, int colz)
+{
+  int i;
+  int subset_card;
+  block vacant;
+
+  vacant.num_items = 0;
+
+  for (i = colz; i < 81; i += 9)
+    {
+      if (UNKNOWN_VALUE == VALUE (g, i))
+        vacant.items[vacant.num_items++] = i;
+    }
+
+  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
+    {
+      bool success;
+
+      success = enumerate_subsets (g, colz, subset_card, &vacant, pigeon_clear_column);
+
+      if (!success)
+        return false;
+    }
+
+  return true;
+}
+
+static bool
+pigeon_clear_box (pigeon_context * context)
+{
+  int i, j, k;
+  int start;
+  bool success;
+  int subset_card = context->subset_card;
+  int box = context->offset;
+  grid *g = context->g;
+  block *b_working = &context->b_working;
+  bool *excluded_working = context->excluded_working;
+
+  start = ((box % 3) * 3) + ((box / 3) * 3) * 9;
+  for (i = 0; i < 3; i++)
+    {
+      for (j = 0; j < 3; j++)
+        {
+          bool use_it;
+
+          if (UNKNOWN_VALUE != VALUE (g, start))
+            continue;
+
+          use_it = true;
+
+          for (j = 0; j < subset_card; j++)
+            {
+              if (start == b_working->items[j])
+                {
+                  use_it = false;
+                  break;
+                }
+            }
+
+          if (!use_it)
+            continue;
+
+          for (k = 0; k < 9; k++)
+            {
+              if (!excluded_working[k])
+                {
+                  success = grid_set_exclusion_at_index (g, start, (value_t) (k + 1));
+
+                  if (!success)
+                    return false;
+                }
+            }
+
+          start++;
+        }
+
+      start += 9 - 3;
+    }
+
+  return true;
+}
+
+static bool
+grid_algo_pigeon_vacant_in_box (grid * g, int box)
+{
+  int i, j;
+  int start;
+  int subset_card;
+  block vacant;
+
+  vacant.num_items = 0;
+
+  start = ((box % 3) * 3) + ((box / 3) * 3) * 9;
+  for (i = 0; i < 3; i++)
+    {
+      for (j = 0; j < 3; j++)
+        {
+          if (UNKNOWN_VALUE == VALUE (g, start))
+            vacant.items[vacant.num_items++] = start;
+
+          start++;
+        }
+
+      start += 9 - 3;
+    }
+
+  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
+    {
+      bool success;
+
+      success = enumerate_subsets (g, box, subset_card, &vacant, pigeon_clear_box);
+
+      if (!success)
+        return false;
+    }
+
+  return true;
+}
+
 bool
 grid_solve (grid * g)
 {
   while (g->dirty)
     {
+      int i;
+      bool success;
+
       do
         {
-          int i;
-          bool success;
-
           g->dirty = false;
 
           for (i = 0; i < 81; i++)
@@ -599,6 +948,24 @@ grid_solve (grid * g)
             }
         }
       while (g->dirty);
+
+      for (i = 0; i < 9; i++)
+        {
+          success = grid_algo_pigeon_vacant_in_rowz (g, i);
+
+          if (!success)
+            return false;
+
+          success = grid_algo_pigeon_vacant_in_colz (g, i);
+
+          if (!success)
+            return false;
+
+          success = grid_algo_pigeon_vacant_in_box (g, i);
+
+          if (!success)
+            return false;
+        }
     }
 
   return true;
@@ -621,10 +988,10 @@ grid_pretty_print (const grid * g)
         {
           for (colz = 0; colz < 9; colz++)
             {
-              if (UNKNOWN_VALUE != VALUE (g, rowz, colz))
+              if (UNKNOWN_VALUE != VALUE_RCZ (g, rowz, colz))
                 {
                   if (1 == i)
-                    printf (" %d ", (int) VALUE (g, rowz, colz));
+                    printf (" %d ", (int) VALUE_RCZ (g, rowz, colz));
                   else
                     printf ("   ");
                 }
@@ -632,7 +999,7 @@ grid_pretty_print (const grid * g)
                 {
                   for (j = 1; j <= 3; j++)
                     {
-                      if (EXCLUDEDX (g, RCZ_2_X (rowz, colz), j + 3 * i))
+                      if (EXCLUDED (g, RCZ_2_INDEX (rowz, colz), j + 3 * i))
                         printf (" ");
                       else
                         printf (TERM_RED "%d" TERM_RESTORE, j + 3 * i);

@@ -4,10 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define ROW_2_ROWZ(r) ((r) - 1)
-#define COL_2_COLZ(c) ((c) - 1)
-#define RCZ_2_X(rowz, colz) ((colz) + ((rowz) * 9))
-
 typedef uint8_t value_t;
 #define UNKNOWN_VALUE ((value_t) 0)
 
