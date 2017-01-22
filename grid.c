@@ -35,6 +35,17 @@ BOX_START (int index)
   return x;
 }
 
+static int
+BOX_START_FROM_WHICH (int which)
+{
+  int x;
+
+  x = (which % 3) * 3;
+  x += ((which / 3) * 3) * 9;
+
+  return x;
+}
+
 void
 grid_create (grid ** g)
 {
@@ -157,22 +168,18 @@ grid_set_value_at_index (grid * g, int index, value_t value)
     }
 
   start = BOX_START (index);
-  for (j = 0; j < 3; j++)
+  for (j = 0; j < 3; j++, start += 6)
     {
-      for (k = 0; k < 3; k++)
+      for (k = 0; k < 3; k++, start++)
         {
-          if (start != index)
-            {
-              success = grid_set_exclusion_at_index (g, start, value);
+          if (start == index)
+            continue;
 
-              if (!success)
-                return false;
-            }
+          success = grid_set_exclusion_at_index (g, start, value);
 
-          start++;
+          if (!success)
+            return false;
         }
-
-      start += 9 - 3;
     }
 
   return true;
@@ -365,17 +372,15 @@ grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
                 }
               else
                 {
-                  for (k = 0; k < 3; k++)
+                  for (k = 0; k < 3; k++, start++)
                     {
                       success = grid_set_exclusion_at_index (g, start, value);
 
                       if (!success)
                         return false;
-
-                      start++;
                     }
 
-                  start += 9 - 3;
+                  start += 6;
                 }
             }
         }
@@ -453,22 +458,18 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
           start = BOX_START (first);
           first_box_colz = first % 3;
 
-          for (j = 0; j < 3; j++)
+          for (j = 0; j < 3; j++, start += 6)
             {
-              for (k = 0; k < 3; k++)
+              for (k = 0; k < 3; k++, start++)
                 {
-                  if (k != first_box_colz)
-                    {
-                      success = grid_set_exclusion_at_index (g, start, value);
+                  if (k == first_box_colz)
+                    continue;
 
-                      if (!success)
-                        return false;
-                    }
+                  success = grid_set_exclusion_at_index (g, start, value);
 
-                  start++;
+                  if (!success)
+                    return false;
                 }
-
-              start += 9 - 3;
             }
         }
     }
@@ -479,28 +480,25 @@ grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
 static bool
 grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value)
 {
-  int i, j, k;
+  int i, j;
+  int start;
   bool success;
   int indices[9];
   int num_indices;
 
-  i = ((box % 3) * 3) + ((box / 3) * 3) * 9;
   num_indices = 0;
+  start = BOX_START_FROM_WHICH (box);
 
-  for (j = 0; j < 3; j++)
+  for (i = 0; i < 3; i++, start += 6)
     {
-      for (k = 0; k < 3; k++)
+      for (j = 0; j < 3; j++, start++)
         {
-          if (value == VALUE (g, i))
+          if (value == VALUE (g, start))
             return true;
 
-          if (!EXCLUDED (g, i, value))
-            indices[num_indices++] = i;
-
-          i++;
+          if (!EXCLUDED (g, start, value))
+            indices[num_indices++] = start;
         }
-
-      i += 9 - 3;
     }
 
   if (0 == num_indices)
@@ -823,10 +821,11 @@ pigeon_clear_box (pigeon_context * context)
   block *b_working = &context->b_working;
   bool *excluded_working = context->excluded_working;
 
-  start = ((box % 3) * 3) + ((box / 3) * 3) * 9;
-  for (i = 0; i < 3; i++)
+  start = BOX_START_FROM_WHICH (box);
+
+  for (i = 0; i < 3; i++, start += 6)
     {
-      for (j = 0; j < 3; j++)
+      for (j = 0; j < 3; j++, start++)
         {
           bool use_it;
 
@@ -857,11 +856,7 @@ pigeon_clear_box (pigeon_context * context)
                     return false;
                 }
             }
-
-          start++;
         }
-
-      start += 9 - 3;
     }
 
   return true;
@@ -876,19 +871,15 @@ grid_algo_pigeon_vacant_in_box (grid * g, int box)
   block vacant;
 
   vacant.num_items = 0;
+  start = BOX_START_FROM_WHICH (box);
 
-  start = ((box % 3) * 3) + ((box / 3) * 3) * 9;
-  for (i = 0; i < 3; i++)
+  for (i = 0; i < 3; i++, start += 6)
     {
-      for (j = 0; j < 3; j++)
+      for (j = 0; j < 3; j++, start++)
         {
           if (UNKNOWN_VALUE == VALUE (g, start))
             vacant.items[vacant.num_items++] = start;
-
-          start++;
         }
-
-      start += 9 - 3;
     }
 
   for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
