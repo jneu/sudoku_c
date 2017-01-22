@@ -25,11 +25,13 @@ TARGET_INTERACTIVE := sudoku
 SOURCES_BATCH := \
 	grid.c \
 	grid_algo.c \
+	grid_pigeon.c \
 	sudoku_batch.c
 
 SOURCES_INTERACTIVE := \
 	grid.c \
 	grid_algo.c \
+	grid_pigeon.c \
 	sudoku.c
 
 HEADERS := \

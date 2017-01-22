@@ -26,7 +26,13 @@ struct def_grid
 int BOX_START (int index);
 int BOX_START_FROM_WHICH (int which);
 
+void grid_set_value_at_index (grid * g, int index, value_t value);
 void grid_set_exclusion_at_index (grid * g, int index, value_t value);
+
+void grid_algo_only_one_available_in_cell (grid * g, int index);
+void grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value);
+void grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value);
+void grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value);
 
 void grid_algo_pigeon_vacant_in_rowz (grid * g, int rowz);
 void grid_algo_pigeon_vacant_in_colz (grid * g, int colz);

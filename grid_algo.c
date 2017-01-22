@@ -1,275 +1,256 @@
-#include <string.h>
-
 #include "grid_internal.h"
 
-typedef struct def_block
+void
+grid_algo_only_one_available_in_cell (grid * g, int index)
 {
-  int items[9];
-  int num_items;
-} block;
+  value_t i;
+  value_t available;
 
-typedef struct def_pigeon_context pigeon_context;
-typedef void (*pigeon_callback) (pigeon_context *);
+  if (UNKNOWN_VALUE != VALUE (g, index))
+    return;
 
-struct def_pigeon_context
-{
-  const block *b_orig;
-  int subset_card;
+  available = UNKNOWN_VALUE;
 
-  int offset;
-  grid *g;
+  for (i = 1; i <= 9; i++)
+    {
+      if (!EXCLUDED (g, index, i))
+        {
+          if (UNKNOWN_VALUE != available)
+            return;
 
-  block b_working;
-  bool excluded_working[9];
+          available = i;
+        }
+    }
 
-  pigeon_callback handle_pigeon;
-};
+  grid_set_value_at_index (g, index, available);
+}
 
-static void
-enumerate_subsets_recurse (pigeon_context * context, int depth, int from)
+void
+grid_algo_need_one_or_bounded_in_rowz (grid * g, int rowz, value_t value)
 {
   int i;
-  int start_num_items;
-  const block *b_orig = context->b_orig;
-  block *b_working = &context->b_working;
+  int first, last;
 
-  start_num_items = b_working->num_items++;
-  depth--;
+  first = -1;
+  last = -1;
 
-  for (i = from; i < b_orig->num_items - depth; i++)
+  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
     {
-      b_working->items[start_num_items] = b_orig->items[i];
+      if (value == VALUE (g, i))
+        return;
 
-      if (0 == depth)
+      if (!EXCLUDED (g, i, value))
         {
-          int j, k;
-          int num_not_fully_excluded;
-          cell *c = context->g->cells;
-          bool *p = context->excluded_working;
+          if (first < 0)
+            first = i;
+          else
+            last = i;
+        }
+    }
 
-          memcpy (p, c[b_working->items[0]].excluded, 9 * sizeof (bool));
+  if (first < 0)
+    {
+      g->inconsistent = true;
+      return;
+    }
 
-          for (j = 1; j < context->subset_card; j++)
-            {
-              const bool *p_orig = c[b_working->items[j]].excluded;
+  if (last < 0)
+    {
+      grid_set_value_at_index (g, first, value);
+    }
+  else
+    {
+      int first_colz, last_colz;
+      bool bounded = false;
 
-              for (k = 0; k < 9; k++)
-                p[k] &= p_orig[k];
-            }
+      first_colz = first % 9;
+      last_colz = last % 9;
 
-          num_not_fully_excluded = 0;
-          for (j = 0; j < 9; j++)
-            if (!p[j])
-              num_not_fully_excluded++;
-
-          if (num_not_fully_excluded == context->subset_card)
-            context->handle_pigeon (context);
+      if (first_colz < 3)
+        {
+          if (last_colz < 3)
+            bounded = true;
+        }
+      else if (first_colz < 6)
+        {
+          if (last_colz < 6)
+            bounded = true;
         }
       else
         {
-          enumerate_subsets_recurse (context, depth, i + 1);
+          bounded = true;
         }
-    }
 
-  b_working->num_items = start_num_items;
-}
-
-static void
-enumerate_subsets (grid * g, int offset, int subset_card, const block * b_orig, pigeon_callback handle_pigeon)
-{
-  pigeon_context context;
-
-  context.b_orig = b_orig;
-  context.subset_card = subset_card;
-  context.offset = offset;
-  context.g = g;
-  context.b_working.num_items = 0;
-  context.handle_pigeon = handle_pigeon;
-
-  enumerate_subsets_recurse (&context, subset_card, 0);
-}
-
-static void
-pigeon_clear_row (pigeon_context * context)
-{
-  int i, j;
-  int subset_card = context->subset_card;
-  int rowz = context->offset;
-  grid *g = context->g;
-  block *b_working = &context->b_working;
-  bool *excluded_working = context->excluded_working;
-
-  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
-    {
-      bool use_it;
-
-      if (UNKNOWN_VALUE != VALUE (g, i))
-        continue;
-
-      use_it = true;
-
-      for (j = 0; j < subset_card; j++)
+      if (bounded)
         {
-          if (i == b_working->items[j])
+          int j, k;
+          int start;
+          int first_box_rowz;
+
+          start = BOX_START (first);
+          first_box_rowz = (first / 9) % 3;
+
+          for (j = 0; j < 3; j++)
             {
-              use_it = false;
-              break;
-            }
-        }
-
-      if (!use_it)
-        continue;
-
-      for (j = 0; j < 9; j++)
-        {
-          if (!excluded_working[j])
-            grid_set_exclusion_at_index (g, i, (value_t) (j + 1));
-        }
-    }
-}
-
-void
-grid_algo_pigeon_vacant_in_rowz (grid * g, int rowz)
-{
-  int i;
-  int subset_card;
-  block vacant;
-
-  vacant.num_items = 0;
-
-  for (i = rowz * 9; i < (rowz + 1) * 9; i++)
-    {
-      if (UNKNOWN_VALUE == VALUE (g, i))
-        vacant.items[vacant.num_items++] = i;
-    }
-
-  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
-    enumerate_subsets (g, rowz, subset_card, &vacant, pigeon_clear_row);
-}
-
-static void
-pigeon_clear_column (pigeon_context * context)
-{
-  int i, j;
-  int subset_card = context->subset_card;
-  int colz = context->offset;
-  grid *g = context->g;
-  block *b_working = &context->b_working;
-  bool *excluded_working = context->excluded_working;
-
-  for (i = colz; i < 81; i += 9)
-    {
-      bool use_it;
-
-      if (UNKNOWN_VALUE != VALUE (g, i))
-        continue;
-
-      use_it = true;
-
-      for (j = 0; j < subset_card; j++)
-        {
-          if (i == b_working->items[j])
-            {
-              use_it = false;
-              break;
-            }
-        }
-
-      if (!use_it)
-        continue;
-
-      for (j = 0; j < 9; j++)
-        {
-          if (!excluded_working[j])
-            grid_set_exclusion_at_index (g, i, (value_t) (j + 1));
-        }
-    }
-}
-
-void
-grid_algo_pigeon_vacant_in_colz (grid * g, int colz)
-{
-  int i;
-  int subset_card;
-  block vacant;
-
-  vacant.num_items = 0;
-
-  for (i = colz; i < 81; i += 9)
-    {
-      if (UNKNOWN_VALUE == VALUE (g, i))
-        vacant.items[vacant.num_items++] = i;
-    }
-
-  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
-    enumerate_subsets (g, colz, subset_card, &vacant, pigeon_clear_column);
-}
-
-static void
-pigeon_clear_box (pigeon_context * context)
-{
-  int i, j, k;
-  int start;
-  int subset_card = context->subset_card;
-  int box = context->offset;
-  grid *g = context->g;
-  block *b_working = &context->b_working;
-  bool *excluded_working = context->excluded_working;
-
-  start = BOX_START_FROM_WHICH (box);
-
-  for (i = 0; i < 3; i++, start += 6)
-    {
-      for (j = 0; j < 3; j++, start++)
-        {
-          bool use_it;
-
-          if (UNKNOWN_VALUE != VALUE (g, start))
-            continue;
-
-          use_it = true;
-
-          for (k = 0; k < subset_card; k++)
-            {
-              if (start == b_working->items[k])
+              if (j == first_box_rowz)
                 {
-                  use_it = false;
-                  break;
+                  start += 9;
+                }
+              else
+                {
+                  for (k = 0; k < 3; k++, start++)
+                    grid_set_exclusion_at_index (g, start, value);
+
+                  start += 6;
                 }
             }
+        }
+    }
+}
 
-          if (!use_it)
-            continue;
+void
+grid_algo_need_one_or_bounded_in_colz (grid * g, int colz, value_t value)
+{
+  int i;
+  int first, last;
 
-          for (k = 0; k < 9; k++)
+  first = -1;
+  last = -1;
+
+  for (i = colz; i < 81; i += 9)
+    {
+      if (value == VALUE (g, i))
+        return;
+
+      if (!EXCLUDED (g, i, value))
+        {
+          if (first < 0)
+            first = i;
+          else
+            last = i;
+        }
+    }
+
+  if (first < 0)
+    {
+      g->inconsistent = true;
+      return;
+    }
+
+  if (last < 0)
+    {
+      grid_set_value_at_index (g, first, value);
+    }
+  else
+    {
+      int first_rowz, last_rowz;
+      bool bounded = false;
+
+      first_rowz = first / 9;
+      last_rowz = last / 9;
+
+      if (first_rowz < 3)
+        {
+          if (last_rowz < 3)
+            bounded = true;
+        }
+      else if (first_rowz < 6)
+        {
+          if (last_rowz < 6)
+            bounded = true;
+        }
+      else
+        {
+          bounded = true;
+        }
+
+      if (bounded)
+        {
+          int j, k;
+          int start;
+          int first_box_colz;
+
+          start = BOX_START (first);
+          first_box_colz = first % 3;
+
+          for (j = 0; j < 3; j++, start += 6)
             {
-              if (!excluded_working[k])
-                grid_set_exclusion_at_index (g, start, (value_t) (k + 1));
+              for (k = 0; k < 3; k++, start++)
+                {
+                  if (k == first_box_colz)
+                    continue;
+
+                  grid_set_exclusion_at_index (g, start, value);
+                }
             }
         }
     }
 }
 
 void
-grid_algo_pigeon_vacant_in_box (grid * g, int box)
+grid_algo_need_one_or_bounded_in_box (grid * g, int box, value_t value)
 {
   int i, j;
   int start;
-  int subset_card;
-  block vacant;
+  int indices[9];
+  int num_indices;
 
-  vacant.num_items = 0;
+  num_indices = 0;
   start = BOX_START_FROM_WHICH (box);
 
   for (i = 0; i < 3; i++, start += 6)
     {
       for (j = 0; j < 3; j++, start++)
         {
-          if (UNKNOWN_VALUE == VALUE (g, start))
-            vacant.items[vacant.num_items++] = start;
+          if (value == VALUE (g, start))
+            return;
+
+          if (!EXCLUDED (g, start, value))
+            indices[num_indices++] = start;
         }
     }
 
-  for (subset_card = 2; subset_card <= (vacant.num_items - 2); subset_card++)
-    enumerate_subsets (g, box, subset_card, &vacant, pigeon_clear_box);
+  if (0 == num_indices)
+    {
+      g->inconsistent = true;
+      return;
+    }
+
+  if (1 == num_indices)
+    {
+      grid_set_value_at_index (g, indices[0], value);
+    }
+  else if (num_indices <= 3)
+    {
+      int rz1, cz1, rz2, cz2;
+
+      rz1 = indices[0] / 9;
+      cz1 = indices[0] % 9;
+
+      rz2 = indices[1] / 9;
+      cz2 = indices[1] % 9;
+
+      if (rz1 == rz2)
+        {
+          if ((2 == num_indices) || (rz1 == (indices[2] / 9)))
+            {
+              for (i = rz1 * 9; i < (rz1 + 1) * 9; i++)
+                {
+                  if (((i % 9) / 3) != (box % 3))
+                    grid_set_exclusion_at_index (g, i, value);
+                }
+            }
+        }
+      else if (cz1 == cz2)
+        {
+          if ((2 == num_indices) || (cz1 == (indices[2] % 9)))
+            {
+              for (i = cz1; i < 81; i += 9)
+                {
+                  if (((i / 9) / 3) != (box / 3))
+                    grid_set_exclusion_at_index (g, i, value);
+                }
+            }
+        }
+    }
 }
