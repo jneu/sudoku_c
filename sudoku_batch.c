@@ -4,11 +4,24 @@
 #include "grid.h"
 
 int
-main (void)
+main (int argc, char *argv[])
 {
   grid *g;
   char line[82];
   int num_solved = 0;
+  FILE *fp;
+
+  if (argc > 1)
+    {
+      fp = fopen (argv[1], "rb");
+      if (NULL == fp)
+        {
+          perror ("failed to open input file\n");
+          exit (EXIT_FAILURE);
+        }
+    }
+  else
+    fp = stdin;
 
   grid_create (&g);
 
@@ -18,7 +31,7 @@ main (void)
       size_t rv;
       bool success;
 
-      rv = fread (line, 1, 82, stdin);
+      rv = fread (line, 1, 82, fp);
       if (0 == rv)
         break;
 
@@ -59,6 +72,8 @@ main (void)
     }
 
   printf ("Number solved: %d\n", num_solved);
+
+  fclose (fp);
 
 #if USE_VALGRIND
   grid_destroy (g);
