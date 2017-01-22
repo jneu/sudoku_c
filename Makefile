@@ -24,14 +24,17 @@ TARGET_INTERACTIVE := sudoku
 
 SOURCES_BATCH := \
 	grid.c \
+	grid_algo.c \
 	sudoku_batch.c
 
 SOURCES_INTERACTIVE := \
 	grid.c \
+	grid_algo.c \
 	sudoku.c
 
 HEADERS := \
-	grid.h
+	grid.h \
+	grid_internal.h
 
 OBJECTS_BATCH := $(patsubst %.c,build/batch/%.o,$(SOURCES_BATCH))
 

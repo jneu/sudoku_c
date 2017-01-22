@@ -21,7 +21,9 @@ main (int argc, char *argv[])
         }
     }
   else
-    fp = stdin;
+    {
+      fp = stdin;
+    }
 
   grid_create (&g);
 
@@ -29,7 +31,6 @@ main (int argc, char *argv[])
     {
       int i;
       size_t rv;
-      bool success;
 
       rv = fread (line, 1, 82, fp);
       if (0 == rv)
@@ -50,17 +51,17 @@ main (int argc, char *argv[])
 
           if ((c >= '1') && (c <= '9'))
             {
-              success = grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
-
-              if (!success)
-                exit (EXIT_FAILURE);
+              grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
             }
         }
 
-      success = grid_solve (g);
+      grid_solve (g);
 
-      if (!success)
-        exit (EXIT_FAILURE);
+      if (!grid_is_consistent (g))
+        {
+          printf ("inconsistent\n");
+          exit (EXIT_FAILURE);
+        }
 
       if (grid_is_solved (g))
         num_solved++;

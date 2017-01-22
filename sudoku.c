@@ -1,7 +1,7 @@
 #include <errno.h>
-#include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -26,7 +26,6 @@ main (void)
   do
     {
       char *line;
-      bool success;
       bool run_solve = false;
 
       line = readline ("> ");
@@ -50,23 +49,17 @@ main (void)
 
           if (3 == sscanf (line, "s %d %d %d", &row, &column, &value))
             {
-              success = grid_add_given_value (g, row, column, value);
-
-              if (success)
-                run_solve = true;
+              grid_add_given_value (g, row, column, value);
+              run_solve = true;
             }
           else if (3 == sscanf (line, "x %d %d %d", &row, &column, &value))
             {
-              success = grid_add_given_exclusion (g, row, column, value);
-
-              if (success)
-                run_solve = true;
+              grid_add_given_exclusion (g, row, column, value);
+              run_solve = true;
             }
           else if (('g' == line[0]) && (' ' == line[1]) && (83 == strlen (line)))
             {
               int i;
-
-              success = true;
 
               grid_clear (g);
 
@@ -75,11 +68,10 @@ main (void)
                   char c = line[i + 2];
 
                   if ((c >= '1') && (c <= '9'))
-                    success &= grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
+                    grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
                 }
 
-              if (success)
-                run_solve = true;
+              run_solve = true;
             }
           else
             {
@@ -91,10 +83,16 @@ main (void)
 
       if (run_solve)
         {
-          success = grid_solve (g);
+          grid_solve (g);
 
-          if (success)
-            grid_pretty_print (g);
+          if (grid_is_consistent (g))
+            {
+              grid_pretty_print (g);
+            }
+          else
+            {
+              printf ("inconsistent\n");
+            }
         }
     }
   while (!done);
