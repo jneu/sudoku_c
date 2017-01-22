@@ -1029,3 +1029,17 @@ grid_pretty_print (const grid * g)
 
   printf ("\n");
 }
+
+bool
+grid_is_solved (grid * g)
+{
+  int i;
+
+  for (i = 0; i < 81; i++)
+    {
+      if (UNKNOWN_VALUE == VALUE (g, i))
+        return false;
+    }
+
+  return true;
+}

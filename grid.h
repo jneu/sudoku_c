@@ -21,5 +21,6 @@ bool grid_add_given_exclusion (grid * g, int row, int column, value_t exclusion)
 bool grid_solve (grid * g);
 
 void grid_pretty_print (const grid * g);
+bool grid_is_solved (grid * g);
 
 #endif
