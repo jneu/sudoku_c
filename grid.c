@@ -835,9 +835,9 @@ pigeon_clear_box (pigeon_context * context)
 
           use_it = true;
 
-          for (j = 0; j < subset_card; j++)
+          for (k = 0; k < subset_card; k++)
             {
-              if (start == b_working->items[j])
+              if (start == b_working->items[k])
                 {
                   use_it = false;
                   break;
