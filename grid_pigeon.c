@@ -38,37 +38,41 @@ enumerate_subsets_recurse (pigeon_context * context, int depth, int from)
 
   for (i = from; i < b_orig->num_items - depth; i++)
     {
+      int j, k;
+      int num_not_fully_excluded;
+      cell *c;
+      bool *p;
+
       b_working->items[start_num_items] = b_orig->items[i];
 
-      if (0 == depth)
-        {
-          int j, k;
-          int num_not_fully_excluded;
-          cell *c = context->g->cells;
-          bool *p = context->excluded_working;
-
-          memcpy (p, c[b_working->items[0]].excluded, 9 * sizeof (bool));
-
-          for (j = 1; j < context->subset_card; j++)
-            {
-              const bool *p_orig = c[b_working->items[j]].excluded;
-
-              for (k = 0; k < 9; k++)
-                p[k] &= p_orig[k];
-            }
-
-          num_not_fully_excluded = 0;
-          for (j = 0; j < 9; j++)
-            if (!p[j])
-              num_not_fully_excluded++;
-
-          if (num_not_fully_excluded == context->subset_card)
-            context->handle_pigeon (context);
-        }
-      else
+      if (0 != depth)
         {
           enumerate_subsets_recurse (context, depth, i + 1);
+          continue;
         }
+
+      c = context->g->cells;
+      p = context->excluded_working;
+
+      memcpy (p, c[b_working->items[0]].excluded, 9 * sizeof (bool));
+
+      for (j = 1; j < context->subset_card; j++)
+        {
+          const bool *p_orig = c[b_working->items[j]].excluded;
+
+          for (k = 0; k < 9; k++)
+            p[k] &= p_orig[k];
+        }
+
+      num_not_fully_excluded = 0;
+      for (j = 0; j < 9; j++)
+        {
+          if (!p[j])
+            num_not_fully_excluded++;
+        }
+
+      if (num_not_fully_excluded == context->subset_card)
+        context->handle_pigeon (context);
     }
 
   b_working->num_items = start_num_items;

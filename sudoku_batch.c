@@ -9,7 +9,7 @@ main (int argc, char *argv[])
   grid *g;
   char line[82];
   int num_solved = 0;
-  FILE *fp;
+  FILE *fp = stdin;
 
   if (argc > 1)
     {
@@ -19,10 +19,6 @@ main (int argc, char *argv[])
           perror ("failed to open input file\n");
           exit (EXIT_FAILURE);
         }
-    }
-  else
-    {
-      fp = stdin;
     }
 
   grid_create (&g);
@@ -50,9 +46,7 @@ main (int argc, char *argv[])
           char c = line[i];
 
           if ((c >= '1') && (c <= '9'))
-            {
-              grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
-            }
+            grid_add_given_value_at_index (g, i, (value_t) (c - '1' + 1));
         }
 
       grid_solve (g);
@@ -64,7 +58,9 @@ main (int argc, char *argv[])
         }
 
       if (grid_is_solved (g))
-        num_solved++;
+        {
+          num_solved++;
+        }
       else
         {
           printf ("%s\n", line);
