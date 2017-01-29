@@ -12,6 +12,7 @@
 
 CC := gcc
 LD := gcc
+INDENT := gindent
 
 CFLAGS := -Wall -Wextra -Werror
 CFLAGS += -pedantic -ansi
@@ -77,13 +78,10 @@ $(TARGET_BATCH): $(OBJECTS_BATCH)
 $(TARGET_INTERACTIVE): $(OBJECTS_INTERACTIVE)
 	$(LD) $(LDFLAGS) $(LDFLAGS_INTERACTIVE) $(OBJECTS_INTERACTIVE) -o $(TARGET_INTERACTIVE)
 
-build/batch/%.o: %.c
+build/batch/%.o: %.c | build/batch
 	$(CC) $(CFLAGS) $(CFLAGS_BATCH) -c $< -o $@
-build/interactive/%.o: %.c
+build/interactive/%.o: %.c | build/interactive
 	$(CC) $(CFLAGS) $(CFLAGS_INTERACTIVE) -c $< -o $@
-
-$(OBJECTS_BATCH): | build/batch
-$(OBJECTS_INTERACTIVE): | build/interactive
 
 build/batch:
 	mkdir -p build/batch
@@ -103,6 +101,6 @@ clean:
 
 .PHONY: indent
 indent:
-	for f in $(SOURCES_INDENT); do gindent -gnu -l120 -nut $$f; done
+	for f in $(SOURCES_INDENT); do $(INDENT) -gnu -l120 -nut $$f; done
 
 -include $(DEPS)
