@@ -8,7 +8,31 @@
 
 #include "grid.h"
 
-#define HISTORY_FILE "/Users/jneuheisel/.sudoku_history"
+#define HISTORY_SUFFIX ".sudoku_history"
+
+static char *
+create_history_file_name (void)
+{
+  int rv;
+  const char *HOME;
+  char *buffer;
+
+  HOME = getenv ("HOME");
+  if (NULL == HOME)
+    {
+      fprintf (stderr, "HOME environment variable is not set; history file is disabled\n");
+      return NULL;
+    }
+
+  rv = asprintf (&buffer, "%s/%s", HOME, HISTORY_SUFFIX);
+  if (rv < 0)
+    {
+      fprintf (stderr, "%s: asprintf failed when creating history file name\n", __FUNCTION__);
+      return NULL;
+    }
+
+  return buffer;
+}
 
 int
 main (void)
@@ -16,10 +40,16 @@ main (void)
   int rv;
   grid *g;
   bool done;
+  char *history_file;
 
-  rv = read_history (HISTORY_FILE);
-  if ((0 != rv) && (ENOENT != rv))
-    printf ("warning: failed to read history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
+  history_file = create_history_file_name ();
+
+  if (NULL != history_file)
+    {
+      rv = read_history (history_file);
+      if ((0 != rv) && (ENOENT != rv))
+        fprintf (stderr, "failed to read history file (%s) - %s\n", history_file, strerror (rv));
+    }
 
   grid_create (&g);
 
@@ -98,9 +128,16 @@ main (void)
     }
   while (!done);
 
-  rv = write_history (HISTORY_FILE);
-  if (0 != rv)
-    printf ("warning: failed to write history file (%s) - %s\n", HISTORY_FILE, strerror (rv));
+  if (NULL != history_file)
+    {
+      rv = write_history (history_file);
+      if (0 != rv)
+        fprintf (stderr, "failed to write history file (%s) - %s\n", history_file, strerror (rv));
+
+#if USE_VALGRIND
+      free (history_file);
+#endif
+    }
 
 #if USE_VALGRIND
   grid_destroy (g);
